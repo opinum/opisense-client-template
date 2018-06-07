@@ -1,0 +1,31 @@
+<h1>Opisense api demo</h1>
+
+<p>This component demonstrates fetching data from the server.</p>
+
+<p *ngIf="!sources"><em>Loading...</em></p>
+
+<table class='table' *ngIf="sources">
+  <thead>
+    <tr>
+      <th>Id</th>
+      <th>Name</th>
+      <th>Serial Number</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr *ngFor="let source of sources">
+      <td><a (click)="clickSource(source)">{{ source.id }}</a></td>
+      <td>{{ source.name }}</td>
+      <td>{{ source.serialNumber }}</td>
+    </tr>
+  </tbody>
+</table>
+
+<div>
+  <fusioncharts [id]="id"
+                [width]="width"
+                [height]="height"
+                [type]="type"
+                [dataFormat]="dataFormat"
+                [dataSource]="dataSource"></fusioncharts>
+</div>
