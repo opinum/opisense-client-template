@@ -54,6 +54,7 @@ namespace OpisenseClientTemplate
                 {
                     options.SlidingExpiration = true;
                     options.Cookie.Name = "Opisense.Authll";
+                    options.Cookie.SameSite = SameSiteMode.None;
                     options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
 
                     options.Events.OnSignedIn = async ctx =>
