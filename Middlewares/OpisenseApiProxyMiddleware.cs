@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using IdentityModel.Client;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
@@ -27,14 +29,19 @@ namespace OpisenseClientTemplate.Middlewares
             {
                 options.PrepareRequest = async (context, originalRequest, message) =>
                 {
-                    var accessToken = await AuthenticationHttpContextExtensions.GetTokenAsync(context, "access_token");
+                    var accessToken = await context.GetTokenAsync(CookieAuthenticationDefaults.AuthenticationScheme, "access_token");
+                    message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                };
+
+                options.PrepareRequestWithAccessToken = async (context, originalRequest,message, accessToken) =>
+                {
                     message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
                 };
 
                 options.RefreshToken = async (context, originalRequest, message) =>
                 {
-                    var userId = PrincipalExtensions.FindFirstValue(context.User, ClaimTypes.NameIdentifier);
-                    await TokenRefreshCoordinator.Refresh(userId, () => RefreshToken(context, identityServerConfiguration));
+                    var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+                  return  await TokenRefreshCoordinator.Refresh(userId, () => RefreshToken(context, identityServerConfiguration));
                 };
             });
         }
@@ -46,7 +53,8 @@ namespace OpisenseClientTemplate.Middlewares
                 identityServerConfiguration.ClientId,
                 identityServerConfiguration.ClientSecret);
 
-            var response = await tokenClient.RequestRefreshTokenAsync(await context.GetTokenAsync("refresh_token"));
+            var refreshToken = await context.GetTokenAsync(CookieAuthenticationDefaults.AuthenticationScheme, "refresh_token");
+            var response = await tokenClient.RequestRefreshTokenAsync(refreshToken);
 
             if (response.IsError)
             {
@@ -58,16 +66,25 @@ namespace OpisenseClientTemplate.Middlewares
                 return (false, null);
             }
 
+            context.Items["RefreshTokenResponse"] = response;
             var tokens = new List<AuthenticationToken>
-            {
-                new AuthenticationToken {Name = OpenIdConnectParameterNames.IdToken, Value = await context.GetTokenAsync("id_token")},
-                new AuthenticationToken {Name = OpenIdConnectParameterNames.AccessToken, Value = response.AccessToken},
-                new AuthenticationToken {Name = OpenIdConnectParameterNames.RefreshToken, Value = response.RefreshToken}
-            };
+                {
+                    new AuthenticationToken {Name = OpenIdConnectParameterNames.IdToken, Value = await context.GetTokenAsync(CookieAuthenticationDefaults.AuthenticationScheme,"id_token")},
+                    new AuthenticationToken {Name = OpenIdConnectParameterNames.AccessToken, Value = response.AccessToken},
+                    new AuthenticationToken {Name = OpenIdConnectParameterNames.RefreshToken, Value = response.RefreshToken}
+                };
+            var expiresAt = DateTime.UtcNow + TimeSpan.FromSeconds(response.ExpiresIn);
+            tokens.Add(new AuthenticationToken { Name = "expires_at", Value = expiresAt.ToString("o", CultureInfo.InvariantCulture) });
 
-            var info = await context.AuthenticateAsync("Cookies");
+            var info = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             info.Properties.StoreTokens(tokens);
-            await context.SignInAsync("Cookies", info.Principal, info.Properties);
+
+            //await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, info.Principal, info.Properties);
+
+            context.Response.OnStarting(async () =>
+             {
+                 await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, info.Principal, info.Properties);
+             });
 
             return (true, response.AccessToken);
         }
@@ -108,9 +125,14 @@ namespace OpisenseClientTemplate.Middlewares
                 //Logger<>.Debug($"Access token refresh for user<{userId}> context<{context.ContextId}> - Waiting for semaphore");
                 try
                 {
-                    await context.Semaphore.WaitAsync();
+                    await context.WaitAsync();
                 }
                 catch (ObjectDisposedException)
+                {
+                    //Logger<>.Debug($"Access token refresh for user<{userId}> context<{context.ContextId}> - Semaphore released");
+                    return (true, context.FreshAccessToken);
+                }
+                catch (Exception ex)
                 {
                     //Logger<>.Debug($"Access token refresh for user<{userId}> context<{context.ContextId}> - Semaphore released");
                     return (true, context.FreshAccessToken);
@@ -125,6 +147,7 @@ namespace OpisenseClientTemplate.Middlewares
 
     internal class AccessTokenRefreshContext
     {
+        private readonly CancellationTokenSource cancellationTokenSource;
         public SemaphoreSlim Semaphore { get; }
         public string FreshAccessToken { get; private set; }
         public Guid ContextId { get; }
@@ -134,12 +157,19 @@ namespace OpisenseClientTemplate.Middlewares
             Semaphore = new SemaphoreSlim(0, 1);
             FreshAccessToken = string.Empty;
             ContextId = Guid.NewGuid();
+            this.cancellationTokenSource = new CancellationTokenSource();
         }
 
         public void UnlockWaiters((bool, string) result)
         {
             FreshAccessToken = result.Item2;
+            cancellationTokenSource.Cancel();
             Semaphore.Dispose();
+        }
+
+        public async Task WaitAsync()
+        {
+            await Semaphore.WaitAsync(cancellationTokenSource.Token);
         }
     }
 }

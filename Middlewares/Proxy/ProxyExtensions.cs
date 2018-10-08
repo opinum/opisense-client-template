@@ -3,6 +3,7 @@ using System.Net;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Internal;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -110,20 +111,21 @@ namespace OpisenseClientTemplate.Middlewares.Proxy
                             var refreshToken = proxyService.Options.RefreshToken;
                             if (refreshToken != null)
                             {
-                                await refreshToken(context, context.Request, requestMessage);
+                                var newToken = await refreshToken(context, context.Request, requestMessage);
 
                                 using (var requestMessage2 = context.CreateProxyHttpRequest(destinationUri))
                                 {
-                                    var prepareRequestHandler2 = proxyService.Options.PrepareRequest;
+                                    var prepareRequestHandler2 = proxyService.Options.PrepareRequestWithAccessToken;
                                     if (prepareRequestHandler2 != null)
                                     {
-                                        await prepareRequestHandler2(context, context.Request, requestMessage2);
+                                        await prepareRequestHandler2(context, context.Request, requestMessage2,newToken.Item2);
                                     }
 
                                     using (var responseMessage2 = await context.SendProxyHttpRequest(requestMessage2))
                                     {
                                         await context.CopyProxyHttpResponse(responseMessage2);
                                     }
+
                                 }
                             }
                         }

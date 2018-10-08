@@ -21,11 +21,15 @@ namespace OpisenseClientTemplate.Middlewares.Proxy
         /// Allows to modify HttpRequestMessage before it is sent to the Message Handler.
         /// </summary>
         public Func<HttpContext, HttpRequest, HttpRequestMessage, Task> PrepareRequest { get; set; }
+        /// <summary>
+        /// Allows to modify HttpRequestMessage before it is sent to the Message Handler.
+        /// </summary>
+        public Func<HttpContext, HttpRequest, HttpRequestMessage,string, Task> PrepareRequestWithAccessToken { get; set; }
 
         /// <summary>
         /// Allows to refresh the auth token in case it is expired.
         /// </summary>
-        public Func<HttpContext, HttpRequest, HttpRequestMessage, Task> RefreshToken { get; set; }
+        public Func<HttpContext, HttpRequest, HttpRequestMessage, Task<(bool, string)>> RefreshToken { get; set; }
 
         /// <summary>
         /// Keep-alive interval for proxied Web Socket connections.
