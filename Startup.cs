@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.SpaServices.AngularCli;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using OpisenseClientTemplate.Middlewares;
@@ -22,8 +23,14 @@ namespace OpisenseClientTemplate
 {
     public class Startup
     {
-        public Startup(IConfiguration configuration)
+        private readonly ILogger<Startup> logger;
+        private readonly ILoggerFactory loggerFactory;
+
+        public Startup(IConfiguration configuration, ILogger<Startup> logger, ILoggerFactory loggerFactory)
         {
+            JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+            this.logger = logger;
+            this.loggerFactory = loggerFactory;
             Configuration = configuration;
         }
 
@@ -35,6 +42,14 @@ namespace OpisenseClientTemplate
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+
+            services.AddLogging(builder =>
+                builder
+                    .AddConfiguration(Configuration.GetSection("Logging"))
+                    .AddDebug()
+            );
+            ApplicationLogging.LoggerFactory = loggerFactory;
+
             Configuration.Bind("OpisenseSettings", opisenseSettings);
             services.AddSingleton(opisenseSettings);
 
@@ -44,7 +59,7 @@ namespace OpisenseClientTemplate
                 configuration.RootPath = "ClientApp/dist";
             });
             
-            JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+           
             services.AddAuthentication(options =>
                 {
                     options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
@@ -54,6 +69,7 @@ namespace OpisenseClientTemplate
                 {
                     options.SlidingExpiration = true;
                     options.Cookie.Name = "Opisense.Authll";
+                    options.Cookie.SameSite = SameSiteMode.None;
                     options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
 
                     options.Events.OnSignedIn = async ctx =>

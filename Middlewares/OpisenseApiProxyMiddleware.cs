@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using OpisenseClientTemplate.Middlewares.Proxy;
 
@@ -18,6 +19,13 @@ namespace OpisenseClientTemplate.Middlewares
 {
     public static class OpisenseApiProxyMiddlewareExtensions
     {
+        private static ILogger logger;
+
+        static OpisenseApiProxyMiddlewareExtensions()
+        {
+            logger = ApplicationLogging.CreateLogger("OpisenseApiProxyMiddlewareExtensions");
+        }
+
         public static IServiceCollection AddOpisenseProxy(this IServiceCollection services, IdentityServerConfiguration identityServerConfiguration)
         {
             if (services == null)
@@ -59,6 +67,7 @@ namespace OpisenseClientTemplate.Middlewares
             if (response.IsError)
             {
                 //logger.Warn($"Failed to refresh token for user {principal.Identity.GetUserId()}, returning 401");
+                logger.LogWarning($"Failed to refresh token for user {context.User.FindFirstValue(ClaimTypes.NameIdentifier)}");
 
                 //TODO
                 //throw new HttpResponseException(HttpStatusCode.Unauthorized);
@@ -66,7 +75,6 @@ namespace OpisenseClientTemplate.Middlewares
                 return (false, null);
             }
 
-            context.Items["RefreshTokenResponse"] = response;
             var tokens = new List<AuthenticationToken>
                 {
                     new AuthenticationToken {Name = OpenIdConnectParameterNames.IdToken, Value = await context.GetTokenAsync(CookieAuthenticationDefaults.AuthenticationScheme,"id_token")},
@@ -91,21 +99,29 @@ namespace OpisenseClientTemplate.Middlewares
     }
 
     /// <summary>
-    /// This class is used to prevent multiple token refresh hapenning at the same time for the same user.
+    /// This class is used to prevent multiple token refresh happening at the same time for the same user.
     /// </summary>
     internal static class TokenRefreshCoordinator
     {
-        //private static readonly ILog Logger = LogManager.GetLogger(typeof(OpisenseApiSecurityHandler));
+        private static readonly ILogger logger;
 
         static readonly ConcurrentDictionary<string, AccessTokenRefreshContext> LockPerUser =
             new ConcurrentDictionary<string, AccessTokenRefreshContext>();
 
+        static TokenRefreshCoordinator()
+        {
+            logger = ApplicationLogging.CreateLogger("TokenRefreshCoordinator");
+
+        }
+
         public static async Task<(bool, string)> Refresh(string userId, Func<Task<(bool, string)>> doRefresh)
         {
+            logger.LogDebug($"Starting Refresh Token. UserId<{userId}>");
+
             if (LockPerUser.TryAdd(userId, new AccessTokenRefreshContext()))
             {
                 var contextId = LockPerUser[userId].ContextId;
-                //logger.Debug($"Access token refresh for user<{userId}> context<{contextId}> - Calling Refresh(method)");
+                logger.LogDebug($"Access token refresh for user<{userId}> context<{contextId}> - Calling Refresh(method)");
                 var freshAccessToken = (false, String.Empty);
                 try
                 {
@@ -122,14 +138,14 @@ namespace OpisenseClientTemplate.Middlewares
 
             if (LockPerUser.TryGetValue(userId, out AccessTokenRefreshContext context))
             {
-                //Logger<>.Debug($"Access token refresh for user<{userId}> context<{context.ContextId}> - Waiting for semaphore");
+                logger.LogDebug($"Access token refresh for user<{userId}> context<{context.ContextId}> - Waiting for semaphore");
                 try
                 {
                     await context.WaitAsync();
                 }
                 catch (ObjectDisposedException)
                 {
-                    //Logger<>.Debug($"Access token refresh for user<{userId}> context<{context.ContextId}> - Semaphore released");
+                    logger.LogDebug($"Access token refresh for user<{userId}> context<{context.ContextId}> - Semaphore released");
                     return (true, context.FreshAccessToken);
                 }
                 catch (Exception ex)
@@ -140,7 +156,7 @@ namespace OpisenseClientTemplate.Middlewares
             }
 
             //At this point, there was a race condition: we could not Add the userId key but were not able to get the dictionary value (LockPerUser.TryRemove was called in between)
-            //Logger<>.Debug($"Access token refresh for user<{userId}> - Got refresh token without dictionary lock");
+            logger.LogDebug($"Access token refresh for user<{userId}> - Got refresh token without dictionary lock");
             return await doRefresh();
         }
     }
@@ -171,5 +187,13 @@ namespace OpisenseClientTemplate.Middlewares
         {
             await Semaphore.WaitAsync(cancellationTokenSource.Token);
         }
+    }
+
+    internal static class ApplicationLogging
+    {
+        internal static ILoggerFactory LoggerFactory { get; set; }// = new LoggerFactory();
+        internal static ILogger CreateLogger<T>() => LoggerFactory.CreateLogger<T>();
+        internal static ILogger CreateLogger(string categoryName) => LoggerFactory.CreateLogger(categoryName);
+
     }
 }
