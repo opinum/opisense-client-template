@@ -58,7 +58,6 @@ namespace OpisenseClientTemplate
             {
                 configuration.RootPath = "ClientApp/dist";
             });
-            
            
             services.AddAuthentication(options =>
                 {
@@ -68,13 +67,13 @@ namespace OpisenseClientTemplate
                 .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
                 {
                     options.SlidingExpiration = true;
-                    options.Cookie.Name = "Opisense.Authll";
+                    options.Cookie.Name = opisenseSettings.AuthenticationCookieName;
                     options.Cookie.SameSite = SameSiteMode.None;
                     options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
 
                     options.Events.OnSignedIn = async ctx =>
                     {
-                        if (!IsAjaxRequest(ctx.Request))
+                        if (!IsAjaxRequest(ctx.Request, opisenseSettings.ApiBasePath))
                         {
                             var redirectUrl = ctx.Request.Cookies[redirectCookieName];
                             if (redirectUrl != null)
@@ -126,7 +125,7 @@ namespace OpisenseClientTemplate
                                                                  $"clientId:Opisense " +
                                                                  $"redirectUri:{HttpUtility.UrlEncode($"{notification.Request.Scheme}://{notification.Request.Host}/oidctoken")}";
 
-                        if (!IsAjaxRequest(notification.Request))
+                        if (!IsAjaxRequest(notification.Request, opisenseSettings.ApiBasePath))
                         {
                             notification.Response.Cookies.Append(redirectCookieName, GetCallbackPathForDeepLinking(notification.Request));
                         }
@@ -188,15 +187,9 @@ namespace OpisenseClientTemplate
             return "/";
         }
 
-        private bool IsAjaxRequest(HttpRequest request)
+        private bool IsAjaxRequest(HttpRequest request, string opisenseSettingsApiBasePath)
         {
-            var query = request.Query;
-            if ((query != null) && (query["X-Requested-With"] == "XMLHttpRequest"))
-            {
-                return true;
-            }
-            IHeaderDictionary headers = request.Headers;
-            return ((headers != null) && (headers["X-Requested-With"] == "XMLHttpRequest"));
+            return request.Path.StartsWithSegments(new PathString(opisenseSettingsApiBasePath));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -217,7 +210,7 @@ namespace OpisenseClientTemplate
 
             // IMPORTANT NOTE: we are telling the Proxy Middleware to register on /api. This means that if you want to host your own API in this project, you cannot use /api
             // See SampleDataController for usage
-            app.RunProxy(new Uri(opisenseSettings.ApiBaseUrl), new PathString("/api"));
+            app.RunProxy(new Uri(opisenseSettings.ApiBaseUrl), new PathString(opisenseSettings.ApiBasePath));
 
             app.UseMvc(routes =>
             {
@@ -262,6 +255,8 @@ namespace OpisenseClientTemplate
     public class OpisenseSettings
     {
         public string ApiBaseUrl { get; set; }
+        public string AuthenticationCookieName { get; set; }
+        public string ApiBasePath { get; set; }
         public IdentityServerConfiguration IdentityServerConfiguration { get; set; }
     }
 
