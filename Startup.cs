@@ -210,7 +210,6 @@ namespace OpisenseClientTemplate
 
             // IMPORTANT NOTE: we are telling the Proxy Middleware to register on /api. This means that if you want to host your own API in this project, you cannot use /api
             // See SampleDataController for usage
-            app.RunProxy(new Uri(opisenseSettings.ApiBaseUrl), new PathString(opisenseSettings.ApiBasePath));
 
             app.UseMvc(routes =>
             {
@@ -232,6 +231,7 @@ namespace OpisenseClientTemplate
                 }
             });
 
+            app.RunProxy(new Uri(opisenseSettings.ApiBaseUrl), new PathString(opisenseSettings.ApiBasePath));
             app.UseSpa(spa =>
             {
                 // To learn more about options for serving an Angular SPA from ASP.NET Core,
@@ -243,6 +243,8 @@ namespace OpisenseClientTemplate
                     spa.UseAngularCliServer(npmScript: "start");
                 }
             });
+
+
         }
     }
 
