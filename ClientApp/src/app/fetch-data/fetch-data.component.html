@@ -21,11 +21,23 @@
   </tbody>
 </table>
 
-<div>
-  <fusioncharts [id]="id"
-                [width]="width"
-                [height]="height"
-                [type]="type"
-                [dataFormat]="dataFormat"
-                [dataSource]="dataSource"></fusioncharts>
+<div *ngIf="opisenseData">
+  <table class='table'>
+    <thead>
+    <tr>
+      <th>
+        Date
+      </th>
+      <th>
+        Value
+      </th>
+    </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let dataItem of opisenseData">
+        <td>{{ dataItem.date }}</td>
+        <td>{{ dataItem.rawValue }}</td>
+      </tr>
+    </tbody>
+  </table>
 </div>

@@ -9,14 +9,8 @@ import { NavMenuComponent } from './nav-menu/nav-menu.component';
 import { HomeComponent } from './home/home.component';
 import { FetchDataComponent } from './fetch-data/fetch-data.component';
 
-import * as FusionCharts from 'fusioncharts';
-import * as Charts from 'fusioncharts/fusioncharts.charts';
-import * as FintTheme from 'fusioncharts/themes/fusioncharts.theme.fint';
-import { FusionChartsModule } from 'angular4-fusioncharts';
 import HttpInterceptor = require("./HttpInterceptor");
 import OpisenseHttpInterceptor = HttpInterceptor.OpisenseHttpInterceptor;
-
-FusionChartsModule.fcRoot(FusionCharts, Charts, FintTheme);
 
 @NgModule({
   declarations: [
@@ -32,8 +26,7 @@ FusionChartsModule.fcRoot(FusionCharts, Charts, FintTheme);
     RouterModule.forRoot([
       { path: '', component: HomeComponent, pathMatch: 'full' },
       { path: 'fetch-data', component: FetchDataComponent },
-    ]),
-    FusionChartsModule
+    ])
   ],
   providers: [{
     provide: HTTP_INTERCEPTORS,

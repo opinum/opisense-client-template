@@ -28,8 +28,6 @@
     "bootstrap": "^3.3.7",
     "core-js": "^2.4.1",
     "rxjs": "^5.5.6",
-    "angular4-fusioncharts": "https://registry.npmjs.org/angular4-fusioncharts/-/angular4-fusioncharts-1.0.0.tgz",
-    "fusioncharts": "^3.12.2",
     "zone.js": "^0.8.19"
   },
   "devDependencies": {
