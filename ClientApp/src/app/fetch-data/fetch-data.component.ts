@@ -1,6 +1,5 @@
 import { Component } from '@angular/core';
 import { OpisenseService, OpisenseSource, OpisenseData } from './opisense.service';
-import Opisenseservice = require("./opisense.service");
 
 @Component({
   selector: 'app-fetch-data',
