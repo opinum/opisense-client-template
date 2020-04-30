@@ -30,7 +30,7 @@
     "aspnet-prerendering": "^3.0.1",
     "bootstrap": "^3.4.1",
     "core-js": "^3.2.1",
-    "jquery": "^3.4.1",
+    "jquery": "^3.5.0",
     "rxjs": "~6.3.3",
     "rxjs-compat": "^6.0.0",
     "zone.js": "^0.10.2"
